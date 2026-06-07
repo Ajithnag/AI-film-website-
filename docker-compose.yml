@@ -1,0 +1,81 @@
+version: '3.8'
+
+services:
+  mongodb:
+    image: mongo:6.0
+    container_name: ai-film-mongodb
+    ports:
+      - '27017:27017'
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: admin
+      MONGO_INITDB_ROOT_PASSWORD: password
+    volumes:
+      - mongodb_data:/data/db
+    networks:
+      - ai-film-network
+
+  redis:
+    image: redis:7.0-alpine
+    container_name: ai-film-redis
+    ports:
+      - '6379:6379'
+    networks:
+      - ai-film-network
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: ai-film-backend
+    ports:
+      - '5000:5000'
+    environment:
+      NODE_ENV: development
+      MONGODB_URI: mongodb://admin:password@mongodb:27017/ai-film
+      REDIS_URL: redis://redis:6379
+    depends_on:
+      - mongodb
+      - redis
+    volumes:
+      - ./backend:/app
+    networks:
+      - ai-film-network
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: ai-film-frontend
+    ports:
+      - '3000:3000'
+    environment:
+      VITE_API_URL: http://localhost:5000
+    depends_on:
+      - backend
+    networks:
+      - ai-film-network
+
+  ai-service:
+    build:
+      context: ./ai-service
+      dockerfile: Dockerfile
+    container_name: ai-film-ai-service
+    ports:
+      - '8000:8000'
+    environment:
+      PYTHONUNBUFFERED: 1
+      MONGODB_URI: mongodb://admin:password@mongodb:27017/ai-film
+    depends_on:
+      - mongodb
+    volumes:
+      - ./ai-service:/app
+      - ./uploads:/app/uploads
+    networks:
+      - ai-film-network
+
+volumes:
+  mongodb_data:
+
+networks:
+  ai-film-network:
+    driver: bridge
